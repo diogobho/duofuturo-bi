@@ -1,0 +1,206 @@
+const API_BASE_URL = window.location.origin + '/api';
+
+class APIError extends Error {
+  public status: number;
+  public data: any;
+
+  constructor(status: number, data: any) {
+    super(data.error || 'An error occurred');
+    this.status = status;
+    this.data = data;
+  }
+}
+
+class APIClient {
+  private baseURL: string;
+  private authToken: string | null = null;
+
+  constructor(baseURL: string) {
+    this.baseURL = baseURL;
+  }
+
+  setAuthToken(token: string | null) {
+    this.authToken = token;
+  }
+
+  private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
+    const url = `${this.baseURL}${endpoint}`;
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    if (this.authToken) {
+      headers['Authorization'] = `Bearer ${this.authToken}`;
+    }
+
+    const config: RequestInit = {
+      ...options,
+      headers,
+    };
+
+    try {
+      const response = await fetch(url, config);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new APIError(response.status, data);
+      }
+
+      return data;
+    } catch (error) {
+      if (error instanceof APIError) {
+        throw error;
+      }
+      throw new APIError(500, { error: 'Network error occurred' });
+    }
+  }
+
+  // Auth endpoints
+  async login(email: string, password: string) {
+    return this.request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async register(userData: {
+    username: string;
+    password: string;
+    nome: string;
+    email: string;
+    data_nascimento: string;
+    endereco: string;
+    role?: string;
+  }) {
+    return this.request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async refreshToken(refreshToken: string) {
+    return this.request('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+  }
+
+  async logout() {
+    return this.request('/auth/logout', {
+      method: 'POST',
+    });
+  }
+
+  async resetPassword(email: string, data_nascimento: string, new_password: string) {
+    return this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, data_nascimento, new_password }),
+    });
+  }
+
+  async getProfile() {
+    return this.request('/users/profile');
+  }
+
+  // Dashboard endpoints
+  async getDashboards() {
+    return this.request('/dashboards');
+  }
+
+  async getDashboard(id: number) {
+    return this.request(`/dashboards/${id}`);
+  }
+
+  async createDashboard(dashboardData: {
+    classe: string;
+    nome: string;
+    iframe: string;
+    link: string;
+    link_mobile: string;
+  }) {
+    return this.request('/dashboards', {
+      method: 'POST',
+      body: JSON.stringify(dashboardData),
+    });
+  }
+
+  async updateDashboard(id: number, dashboardData: {
+    classe: string;
+    nome: string;
+    iframe: string;
+    link: string;
+    link_mobile: string;
+  }) {
+    return this.request(`/dashboards/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(dashboardData),
+    });
+  }
+
+  async deleteDashboard(id: number) {
+    return this.request(`/dashboards/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async assignDashboard(userId: number, dashboardId: number) {
+    return this.request('/dashboards/assign', {
+      method: 'POST',
+      body: JSON.stringify({ userId, dashboardId }),
+    });
+  }
+
+  async unassignDashboard(userId: number, dashboardId: number) {
+    return this.request('/dashboards/unassign', {
+      method: 'POST',
+      body: JSON.stringify({ userId, dashboardId }),
+    });
+  }
+
+  async getTableauToken() {
+    return this.request('/dashboards/tableau/token');
+  }
+
+  // User endpoints
+  async getUsers() {
+    return this.request('/users');
+  }
+
+  async getUser(id: number) {
+    return this.request(`/users/${id}`);
+  }
+
+  async updateUser(id: number, userData: {
+    username?: string;
+    nome?: string;
+    email?: string;
+    data_nascimento?: string;
+    endereco?: string;
+    role?: string;
+  }) {
+    return this.request(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async deleteUser(id: number) {
+    return this.request(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async changePassword(id: number, passwords: {
+    current_password?: string;
+    new_password: string;
+  }) {
+    return this.request(`/users/${id}/change-password`, {
+      method: 'POST',
+      body: JSON.stringify(passwords),
+    });
+  }
+}
+
+export const authAPI = new APIClient(API_BASE_URL);
