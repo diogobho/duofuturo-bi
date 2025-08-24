@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from '../components/Header';
+import { UserForm } from '../components/UserForm';
+import { DashboardForm } from '../components/DashboardForm';
 import { authAPI } from '../services/api';
 import { showToast } from '../components/Toaster';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -45,6 +47,7 @@ export const AdminPage: React.FC = () => {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedDashboard, setSelectedDashboard] = useState<Dashboard | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDashboardModal, setShowDashboardModal] = useState(false);
 
@@ -146,6 +149,24 @@ export const AdminPage: React.FC = () => {
         Viewer
       </span>
     );
+  };
+
+  const handleUserModalClose = () => {
+    setShowUserModal(false);
+    setSelectedUser(null);
+  };
+
+  const handleDashboardModalClose = () => {
+    setShowDashboardModal(false);
+    setSelectedDashboard(null);
+  };
+
+  const handleUserSuccess = () => {
+    loadUsers();
+  };
+
+  const handleDashboardSuccess = () => {
+    loadDashboards();
   };
 
   if (isLoading && (users.length === 0 && dashboards.length === 0)) {
@@ -252,10 +273,12 @@ export const AdminPage: React.FC = () => {
                     <tr key={user.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                            <span className="text-white font-medium text-sm">
-                              {user.nome.split(' ').map(n => n[0]).join('')}
-                            </span>
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
+                              <span className="text-sm font-medium text-white">
+                                {user.nome.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
@@ -272,16 +295,16 @@ export const AdminPage: React.FC = () => {
                           <Mail className="w-4 h-4 mr-2 text-gray-400" />
                           {user.email}
                         </div>
-                        <div className="text-sm text-gray-500 flex items-center mt-1">
-                          <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                          {formatDate(user.data_nascimento)}
+                        <div className="text-sm text-gray-500 flex items-center">
+                          <MapPin className="w-4 h-4 mr-2 text-gray-400" />
+                          {user.endereco}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getRoleBadge(user.role)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                           {user.dashboard_count} dashboard{user.dashboard_count !== 1 ? 's' : ''}
                         </span>
                       </td>
@@ -357,8 +380,8 @@ export const AdminPage: React.FC = () => {
                     <div className="flex items-center space-x-2 ml-4">
                       <button
                         onClick={() => {
-                          // Handle edit dashboard
-                          console.log('Edit dashboard:', dashboard.id);
+                          setSelectedDashboard(dashboard);
+                          setShowDashboardModal(true);
                         }}
                         className="text-blue-600 hover:text-blue-900 p-1"
                       >
@@ -412,50 +435,21 @@ export const AdminPage: React.FC = () => {
         )}
       </div>
 
-      {/* Modals would go here - simplified for now */}
+      {/* Modals */}
       {showUserModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              {selectedUser ? 'Editar Usuário' : 'Novo Usuário'}
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Funcionalidade de formulário será implementada aqui
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowUserModal(false);
-                  setSelectedUser(null);
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+        <UserForm
+          user={selectedUser}
+          onClose={handleUserModalClose}
+          onSuccess={handleUserSuccess}
+        />
       )}
 
       {showDashboardModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Novo Dashboard
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Funcionalidade de formulário será implementada aqui
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDashboardModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+        <DashboardForm
+          dashboard={selectedDashboard}
+          onClose={handleDashboardModalClose}
+          onSuccess={handleDashboardSuccess}
+        />
       )}
     </div>
   );

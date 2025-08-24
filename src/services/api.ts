@@ -66,6 +66,21 @@ class APIClient {
   }
 
   async register(userData: {
+
+  async createUser(userData: {
+    username: string;
+    password: string;
+    nome: string;
+    email: string;
+    data_nascimento: string;
+    endereco: string;
+    role?: string;
+  }) {
+    return this.request("/users", {
+      method: "POST",
+      body: JSON.stringify(userData),
+    });
+  },
     username: string;
     password: string;
     nome: string;
@@ -170,6 +185,21 @@ class APIClient {
 
   async getUser(id: number) {
     return this.request(`/users/${id}`);
+  }
+
+  async createUser(userData: {
+    username: string;
+    password: string;
+    nome: string;
+    email: string;
+    data_nascimento: string;
+    endereco: string;
+    role?: string;
+  }) {
+    return this.request("/users", {
+      method: "POST",
+      body: JSON.stringify(userData),
+    });
   }
 
   async updateUser(id: number, userData: {
