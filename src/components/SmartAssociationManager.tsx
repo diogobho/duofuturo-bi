@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
-import { Users, BarChart3, Plus, X, Check } from 'lucide-react';
 
 interface User {
   id: number;
   nome: string;
   email: string;
-  username: string;
   role: string;
 }
 
@@ -14,56 +12,59 @@ interface Dashboard {
   id: number;
   nome: string;
   classe: string;
-  descricao?: string;
 }
+
+interface Assignment {
+  id: number;
+  user_id: number;
+  dashboard_id: number;
+  user_name: string;
+  user_email: string;
+  dashboard_name: string;
+  dashboard_class: string;
+  assigned_at: string;
+}
+
+type AssociationMode = 'single' | 'multiple-dash' | 'multiple-users';
 
 export const SmartAssociationManager: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [mode, setMode] = useState<AssociationMode>('single');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Single mode states
   const [selectedUser, setSelectedUser] = useState<number>(0);
   const [selectedDashboard, setSelectedDashboard] = useState<number>(0);
+
+  // Multiple mode states
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [selectedDashboards, setSelectedDashboards] = useState<number[]>([]);
-  const [mode, setMode] = useState<'single' | 'multiple-dash' | 'multiple-users'>('single');
-  const [isLoading, setIsLoading] = useState(false);
-  const [availableOptions, setAvailableOptions] = useState<{users: User[], dashboards: Dashboard[]}>({users: [], dashboards: []});
 
   useEffect(() => {
-    loadInitialData();
+    loadData();
   }, []);
 
-  const loadInitialData = async () => {
+  const loadData = async () => {
     try {
-      const [usersRes, dashboardsRes] = await Promise.all([
+      setIsLoading(true);
+      const [usersRes, dashboardsRes, assignmentsRes] = await Promise.all([
         authAPI.getUsers(),
-        authAPI.getDashboards()
+        authAPI.getDashboards(),
+        authAPI.getAllAssignments()
       ]);
+      
       setUsers(usersRes.users || []);
       setDashboards(dashboardsRes.dashboards || []);
+      setAssignments(assignmentsRes.assignments || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+      alert('Erro ao carregar dados: ' + (error as Error).message);
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const loadAvailableOptions = async () => {
-    try {
-      if (mode === 'multiple-dash' && selectedUser) {
-        const result = await authAPI.getDashboardsNotAssignedToUser(selectedUser);
-        setAvailableOptions({users: [], dashboards: result.dashboards || []});
-      } else if (mode === 'multiple-users' && selectedDashboard) {
-        const result = await authAPI.getUsersWithoutDashboard(selectedDashboard);
-        setAvailableOptions({users: result.users || [], dashboards: []});
-      }
-    } catch (error) {
-      console.error('Erro ao carregar opções:', error);
-    }
-  };
-
-  useEffect(() => {
-    if (mode !== 'single') {
-      loadAvailableOptions();
-    }
-  }, [mode, selectedUser, selectedDashboard]);
 
   const handleSingleAssociation = async () => {
     if (!selectedUser || !selectedDashboard) {
@@ -73,9 +74,10 @@ export const SmartAssociationManager: React.FC = () => {
 
     try {
       setIsLoading(true);
-      await authAPI.unassignDashboard(selectedUser, selectedDashboard);
+      await authAPI.assignDashboard(selectedUser, selectedDashboard);
       alert('Associação criada com sucesso!');
       resetForm();
+      loadData();
     } catch (error: any) {
       alert('Erro ao criar associação: ' + error.message);
     } finally {
@@ -94,6 +96,7 @@ export const SmartAssociationManager: React.FC = () => {
       await authAPI.assignMultipleDashboards(selectedUser, selectedDashboards);
       alert(`${selectedDashboards.length} dashboards associados com sucesso!`);
       resetForm();
+      loadData();
     } catch (error: any) {
       alert('Erro ao associar dashboards: ' + error.message);
     } finally {
@@ -112,10 +115,23 @@ export const SmartAssociationManager: React.FC = () => {
       await authAPI.assignDashboardToMultipleUsers(selectedDashboard, selectedUsers);
       alert(`Dashboard associado a ${selectedUsers.length} usuários com sucesso!`);
       resetForm();
+      loadData();
     } catch (error: any) {
       alert('Erro ao associar usuários: ' + error.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleUnassign = async (userId: number, dashboardId: number) => {
+    if (!confirm('Remover esta associação?')) return;
+
+    try {
+      await authAPI.unassignDashboard(userId, dashboardId);
+      alert('Associação removida com sucesso!');
+      loadData();
+    } catch (error: any) {
+      alert('Erro ao remover associação: ' + error.message);
     }
   };
 
@@ -124,7 +140,6 @@ export const SmartAssociationManager: React.FC = () => {
     setSelectedDashboard(0);
     setSelectedUsers([]);
     setSelectedDashboards([]);
-    setAvailableOptions({users: [], dashboards: []});
   };
 
   const toggleUserSelection = (userId: number) => {
@@ -143,37 +158,82 @@ export const SmartAssociationManager: React.FC = () => {
     );
   };
 
+  const executeAssociation = () => {
+    switch (mode) {
+      case 'single':
+        handleSingleAssociation();
+        break;
+      case 'multiple-dash':
+        handleMultipleDashboardsAssociation();
+        break;
+      case 'multiple-users':
+        handleMultipleUsersAssociation();
+        break;
+    }
+  };
+
+  if (isLoading && assignments.length === 0) {
+    return <div className="text-center py-8">Carregando...</div>;
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header com estatísticas */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Gerenciamento Inteligente de Associações</h3>
-        
-        {/* Mode Selection */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">Tipo de Associação</label>
-          <div className="flex space-x-4">
-            <button
-              onClick={() => { setMode('single'); resetForm(); }}
-              className={`px-4 py-2 rounded-lg ${mode === 'single' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-            >
-              1 para 1
-            </button>
-            <button
-              onClick={() => { setMode('multiple-dash'); resetForm(); }}
-              className={`px-4 py-2 rounded-lg ${mode === 'multiple-dash' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-            >
-              Múltiplos Dashboards para 1 Usuário
-            </button>
-            <button
-              onClick={() => { setMode('multiple-users'); resetForm(); }}
-              className={`px-4 py-2 rounded-lg ${mode === 'multiple-users' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-            >
-              1 Dashboard para Múltiplos Usuários
-            </button>
+        <h2 className="text-xl font-semibold mb-4">Gerenciamento de Associações</h2>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="text-2xl font-bold text-blue-600">{users.length}</div>
+            <div className="text-sm text-gray-600">Usuários</div>
+          </div>
+          <div className="bg-green-50 p-4 rounded-lg">
+            <div className="text-2xl font-bold text-green-600">{dashboards.length}</div>
+            <div className="text-sm text-gray-600">Dashboards</div>
+          </div>
+          <div className="bg-purple-50 p-4 rounded-lg">
+            <div className="text-2xl font-bold text-purple-600">{assignments.length}</div>
+            <div className="text-sm text-gray-600">Associações Ativas</div>
           </div>
         </div>
+      </div>
 
-        {/* Single Association */}
+      {/* Seletor de modo */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold mb-4">Tipo de Associação</h3>
+        <div className="flex space-x-2 mb-6">
+          <button
+            onClick={() => { setMode('single'); resetForm(); }}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              mode === 'single' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            1 para 1
+          </button>
+          <button
+            onClick={() => { setMode('multiple-dash'); resetForm(); }}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              mode === 'multiple-dash' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            1 Usuário → Múltiplos Dashboards
+          </button>
+          <button
+            onClick={() => { setMode('multiple-users'); resetForm(); }}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              mode === 'multiple-users' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            1 Dashboard → Múltiplos Usuários
+          </button>
+        </div>
+
+        {/* Formulários baseados no modo */}
         {mode === 'single' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <select
@@ -203,7 +263,7 @@ export const SmartAssociationManager: React.FC = () => {
             </select>
             
             <button
-              onClick={handleSingleAssociation}
+              onClick={executeAssociation}
               disabled={isLoading}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
@@ -212,11 +272,10 @@ export const SmartAssociationManager: React.FC = () => {
           </div>
         )}
 
-        {/* Multiple Dashboards to One User */}
         {mode === 'multiple-dash' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Selecionar Usuário</label>
+          <div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Selecione o Usuário</label>
               <select
                 value={selectedUser}
                 onChange={(e) => setSelectedUser(Number(e.target.value))}
@@ -230,45 +289,42 @@ export const SmartAssociationManager: React.FC = () => {
                 ))}
               </select>
             </div>
-
-            {selectedUser > 0 && availableOptions.dashboards.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Selecionar Dashboards Disponíveis ({selectedDashboards.length} selecionados)
-                </label>
-                <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-2">
-                  {availableOptions.dashboards.map(dashboard => (
-                    <label key={dashboard.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={selectedDashboards.includes(dashboard.id)}
-                        onChange={() => toggleDashboardSelection(dashboard.id)}
-                        className="h-4 w-4 text-blue-600"
-                      />
-                      <div>
-                        <span className="font-medium">{dashboard.nome}</span>
-                        <span className="text-sm text-gray-500 ml-2">({dashboard.classe})</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                <button
-                  onClick={handleMultipleDashboardsAssociation}
-                  disabled={isLoading || selectedDashboards.length === 0}
-                  className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {isLoading ? 'Associando...' : `Associar ${selectedDashboards.length} Dashboards`}
-                </button>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">
+                Selecione os Dashboards ({selectedDashboards.length} selecionados)
+              </label>
+              <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+                {dashboards.map(dashboard => (
+                  <label key={dashboard.id} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
+                    <input
+                      type="checkbox"
+                      checked={selectedDashboards.includes(dashboard.id)}
+                      onChange={() => toggleDashboardSelection(dashboard.id)}
+                      className="rounded"
+                    />
+                    <span className="text-sm">
+                      {dashboard.nome} <span className="text-gray-500">({dashboard.classe})</span>
+                    </span>
+                  </label>
+                ))}
               </div>
-            )}
+            </div>
+            
+            <button
+              onClick={executeAssociation}
+              disabled={isLoading || !selectedUser || selectedDashboards.length === 0}
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isLoading ? 'Associando...' : `Associar ${selectedDashboards.length} Dashboards`}
+            </button>
           </div>
         )}
 
-        {/* One Dashboard to Multiple Users */}
         {mode === 'multiple-users' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Selecionar Dashboard</label>
+          <div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Selecione o Dashboard</label>
               <select
                 value={selectedDashboard}
                 onChange={(e) => setSelectedDashboard(Number(e.target.value))}
@@ -282,40 +338,88 @@ export const SmartAssociationManager: React.FC = () => {
                 ))}
               </select>
             </div>
-
-            {selectedDashboard > 0 && availableOptions.users.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Selecionar Usuários Disponíveis ({selectedUsers.length} selecionados)
-                </label>
-                <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-2">
-                  {availableOptions.users.map(user => (
-                    <label key={user.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={selectedUsers.includes(user.id)}
-                        onChange={() => toggleUserSelection(user.id)}
-                        className="h-4 w-4 text-blue-600"
-                      />
-                      <div>
-                        <span className="font-medium">{user.nome}</span>
-                        <span className="text-sm text-gray-500 ml-2">({user.email})</span>
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-2">{user.role}</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                <button
-                  onClick={handleMultipleUsersAssociation}
-                  disabled={isLoading || selectedUsers.length === 0}
-                  className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {isLoading ? 'Associando...' : `Associar a ${selectedUsers.length} Usuários`}
-                </button>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">
+                Selecione os Usuários ({selectedUsers.length} selecionados)
+              </label>
+              <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+                {users.map(user => (
+                  <label key={user.id} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.includes(user.id)}
+                      onChange={() => toggleUserSelection(user.id)}
+                      className="rounded"
+                    />
+                    <span className="text-sm">
+                      {user.nome} <span className="text-gray-500">({user.email})</span>
+                    </span>
+                  </label>
+                ))}
               </div>
-            )}
+            </div>
+            
+            <button
+              onClick={executeAssociation}
+              disabled={isLoading || !selectedDashboard || selectedUsers.length === 0}
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isLoading ? 'Associando...' : `Associar a ${selectedUsers.length} Usuários`}
+            </button>
           </div>
         )}
+      </div>
+
+      {/* Lista de Associações */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold mb-4">Associações Existentes</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 px-2">Usuário</th>
+                <th className="text-left py-2 px-2">Email</th>
+                <th className="text-left py-2 px-2">Dashboard</th>
+                <th className="text-left py-2 px-2">Classe</th>
+                <th className="text-left py-2 px-2">Data</th>
+                <th className="text-left py-2 px-2">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assignments.map(assignment => (
+                <tr key={`${assignment.user_id}-${assignment.dashboard_id}`} className="border-b hover:bg-gray-50">
+                  <td className="py-2 px-2">{assignment.user_name}</td>
+                  <td className="py-2 px-2 text-gray-600">{assignment.user_email}</td>
+                  <td className="py-2 px-2">{assignment.dashboard_name}</td>
+                  <td className="py-2 px-2">
+                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                      {assignment.dashboard_class}
+                    </span>
+                  </td>
+                  <td className="py-2 px-2 text-gray-600">
+                    {new Date(assignment.assigned_at).toLocaleDateString('pt-BR')}
+                  </td>
+                  <td className="py-2 px-2">
+                    <button
+                      onClick={() => handleUnassign(assignment.user_id, assignment.dashboard_id)}
+                      className="text-red-600 hover:text-red-800 text-xs font-medium"
+                    >
+                      Remover
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {assignments.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-gray-500">
+                    Nenhuma associação encontrada
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

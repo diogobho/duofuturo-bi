@@ -1,6 +1,15 @@
 import bcrypt from 'bcrypt';
 import pool from '../config/db.js';
 
+export const getUserProfile = async (req, res) => {
+  try {
+    res.json({ user: req.user });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const getUsers = async (req, res) => {
   try {
     const result = await pool.query('SELECT id, username, nome, email, role, data_nascimento, endereco, created_at FROM users ORDER BY created_at DESC');
@@ -73,6 +82,10 @@ export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
     
+    // First delete user's dashboard assignments
+    await pool.query('DELETE FROM user_dashboards WHERE user_id = $1', [id]);
+    
+    // Then delete the user
     const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
     
     if (result.rows.length === 0) {
@@ -86,23 +99,21 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-export const getUserProfile = async (req, res) => {
-  try {
-    res.json({ user: req.user });
-  } catch (error) {
-    console.error('Get profile error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
 export const changePassword = async (req, res) => {
   try {
     const { id } = req.params;
-    const { new_password } = req.body;
+    const { newPassword } = req.body;
     
-    const hashedPassword = await bcrypt.hash(new_password, 12);
+    if (!newPassword) {
+      return res.status(400).json({ error: 'New password is required' });
+    }
     
-    const result = await pool.query('UPDATE users SET senha = $1, updated_at = NOW() WHERE id = $2 RETURNING id', [hashedPassword, id]);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    
+    const result = await pool.query(
+      'UPDATE users SET senha = $1, updated_at = NOW() WHERE id = $2 RETURNING id',
+      [hashedPassword, id]
+    );
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });

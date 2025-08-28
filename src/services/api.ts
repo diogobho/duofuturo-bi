@@ -39,6 +39,7 @@ class ApiClient {
     return await response.json();
   }
 
+  // Auth endpoints
   async login(email: string, password: string) {
     const result = await this.request('/auth/login', {
       method: 'POST',
@@ -52,6 +53,42 @@ class ApiClient {
     return result;
   }
 
+  async register(userData: {
+    username: string;
+    password: string;
+    nome: string;
+    email: string;
+    data_nascimento: string;
+    endereco: string;
+    role?: string;
+  }) {
+    return this.request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async refreshToken(refreshToken: string) {
+    return this.request('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+  }
+
+  async logout() {
+    return this.request('/auth/logout', {
+      method: 'POST',
+    });
+  }
+
+  async resetPassword(email: string, data_nascimento: string, new_password: string) {
+    return this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, data_nascimento, new_password }),
+    });
+  }
+
+  // User endpoints
   async getProfile() {
     return this.request('/users/profile');
   }
@@ -79,7 +116,14 @@ class ApiClient {
     });
   }
 
-  async updateUser(id: number, userData: any) {
+  async updateUser(id: number, userData: {
+    username?: string;
+    nome?: string;
+    email?: string;
+    data_nascimento?: string;
+    endereco?: string;
+    role?: string;
+  }) {
     return this.request(`/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(userData),
@@ -92,6 +136,14 @@ class ApiClient {
     });
   }
 
+  async changePassword(userId: number, newPassword: string) {
+    return this.request(`/users/${userId}/change-password`, {
+      method: 'POST',
+      body: JSON.stringify({ newPassword }),
+    });
+  }
+
+  // Dashboard endpoints
   async getDashboards() {
     return this.request('/dashboards');
   }
@@ -112,7 +164,12 @@ class ApiClient {
     });
   }
 
-  async updateDashboard(id: number, dashboardData: any) {
+  async updateDashboard(id: number, dashboardData: {
+    nome?: string;
+    descricao?: string;
+    url?: string;
+    classe?: string;
+  }) {
     return this.request(`/dashboards/${id}`, {
       method: 'PUT',
       body: JSON.stringify(dashboardData),
@@ -129,7 +186,22 @@ class ApiClient {
     return this.request('/dashboards/tableau/token');
   }
 
-  // Associações inteligentes - múltiplas seleções
+  // Association endpoints - Basic
+  async assignDashboard(userId: number, dashboardId: number) {
+    return this.request('/dashboards/assign', {
+      method: 'POST',
+      body: JSON.stringify({ userId, dashboardId }),
+    });
+  }
+
+  async unassignDashboard(userId: number, dashboardId: number) {
+    return this.request('/dashboards/unassign', {
+      method: 'POST',
+      body: JSON.stringify({ userId, dashboardId }),
+    });
+  }
+
+  // Association endpoints - Multiple selections
   async assignMultipleDashboards(userId: number, dashboardIds: number[]) {
     return this.request('/dashboards/assign-multiple', {
       method: 'POST',
@@ -144,19 +216,17 @@ class ApiClient {
     });
   }
 
-  async getUserDashboards(userId: number) {
-    return this.request(`/users/${userId}/dashboards`);
-  }
-
+  // Query endpoints for associations
   async getAllAssignments() {
     return this.request('/dashboards/assignments');
   }
 
-  async unassignDashboard(userId: number, dashboardId: number) {
-    return this.request('/dashboards/unassign', {
-      method: 'POST',
-      body: JSON.stringify({ userId, dashboardId }),
-    });
+  async getUserDashboards(userId: number) {
+    return this.request(`/users/${userId}/dashboards`);
+  }
+
+  async getUserAssignments(userId: number) {
+    return this.getUserDashboards(userId);
   }
 
   async getUsersWithoutDashboard(dashboardId: number) {
