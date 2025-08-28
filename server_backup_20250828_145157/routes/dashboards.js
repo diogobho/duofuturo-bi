@@ -1,11 +1,9 @@
 import express from 'express';
 import { verifyToken, requireRole } from '../middleware/auth.js';
+import pool from '../config/db.js';
 import {
   getUserDashboards,
-  getDashboard,
   createDashboard,
-  updateDashboard,
-  deleteDashboard,
   assignDashboard,
   unassignDashboard,
   getTableauToken
@@ -13,18 +11,11 @@ import {
 
 const router = express.Router();
 
-// Todas as rotas requerem autenticação
 router.use(verifyToken);
 
-// Rotas públicas para usuários autenticados
 router.get('/', getUserDashboards);
 router.get('/tableau/token', getTableauToken);
-router.get('/:id', getDashboard);
-
-// Rotas administrativas (apenas creators)
 router.post('/', requireRole(['creator']), createDashboard);
-router.put('/:id', requireRole(['creator']), updateDashboard);
-router.delete('/:id', requireRole(['creator']), deleteDashboard);
 router.post('/assign', requireRole(['creator']), assignDashboard);
 router.post('/unassign', requireRole(['creator']), unassignDashboard);
 

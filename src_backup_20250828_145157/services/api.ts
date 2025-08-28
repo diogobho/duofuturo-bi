@@ -32,14 +32,12 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     return await response.json();
   }
 
-  // Auth endpoints
   async login(email: string, password: string) {
     const result = await this.request('/auth/login', {
       method: 'POST',
@@ -57,13 +55,8 @@ class ApiClient {
     return this.request('/users/profile');
   }
 
-  // User endpoints
   async getUsers() {
     return this.request('/users');
-  }
-
-  async getUser(id: number) {
-    return this.request(`/users/${id}`);
   }
 
   async createUser(userData: {
@@ -81,26 +74,8 @@ class ApiClient {
     });
   }
 
-  async updateUser(id: number, userData: any) {
-    return this.request(`/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(userData),
-    });
-  }
-
-  async deleteUser(id: number) {
-    return this.request(`/users/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Dashboard endpoints
   async getDashboards() {
     return this.request('/dashboards');
-  }
-
-  async getDashboard(id: number) {
-    return this.request(`/dashboards/${id}`);
   }
 
   async createDashboard(dashboardData: {
@@ -115,24 +90,6 @@ class ApiClient {
     });
   }
 
-  async updateDashboard(id: number, dashboardData: any) {
-    return this.request(`/dashboards/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(dashboardData),
-    });
-  }
-
-  async deleteDashboard(id: number) {
-    return this.request(`/dashboards/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async getTableauToken() {
-    return this.request('/dashboards/tableau/token');
-  }
-
-  // Association endpoints
   async assignDashboard(userId: number, dashboardId: number) {
     return this.request('/dashboards/assign', {
       method: 'POST',
@@ -145,6 +102,10 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ userId, dashboardId }),
     });
+  }
+
+  async getUserAssignments(userId: number) {
+    return this.request(`/users/${userId}/dashboards`);
   }
 }
 
