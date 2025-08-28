@@ -1,43 +1,19 @@
-import pool from '../config/database.js';
-import { generateTableauJWT, buildTableauUrl } from '../config/tableau.js';
+import pool from '../config/db.js';
+import jwt from 'jsonwebtoken';
 
 export const getUserDashboards = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const userRole = req.user.role;
-
-    let query;
-    let params;
-
-    if (userRole === 'creator') {
-      // Creators can see all dashboards
-      query = `
-        SELECT d.*, 
-               CASE WHEN ud.user_id IS NOT NULL THEN true ELSE false END as has_access
-        FROM dashboards d
-        LEFT JOIN user_dashboards ud ON d.id = ud.dashboard_id AND ud.user_id = $1
-        ORDER BY d.nome
-      `;
-      params = [userId];
-    } else {
-      // Viewers can only see assigned dashboards
-      query = `
-        SELECT d.*
-        FROM dashboards d
-        INNER JOIN user_dashboards ud ON d.id = ud.dashboard_id
-        WHERE ud.user_id = $1
-        ORDER BY d.nome
-      `;
-      params = [userId];
-    }
-
-    const result = await pool.query(query, params);
+    const result = await pool.query(`
+      SELECT d.*, ud.created_at as assigned_at 
+      FROM dashboards d 
+      LEFT JOIN user_dashboards ud ON d.id = ud.dashboard_id 
+      WHERE ud.user_id = $1 OR $2 = 'creator'
+      ORDER BY d.nome
+    `, [req.user.id, req.user.role]);
     
-    res.json({
-      dashboards: result.rows
-    });
+    res.json({ dashboards: result.rows });
   } catch (error) {
-    console.error('Get dashboards error:', error);
+    console.error('Get user dashboards error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -45,66 +21,39 @@ export const getUserDashboards = async (req, res) => {
 export const getDashboard = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.userId;
-    const userRole = req.user.role;
-
-    // Check access
-    let accessQuery;
-    let accessParams;
-
-    if (userRole === 'creator') {
-      accessQuery = 'SELECT * FROM dashboards WHERE id = $1';
-      accessParams = [id];
-    } else {
-      accessQuery = `
-        SELECT d.*
-        FROM dashboards d
-        INNER JOIN user_dashboards ud ON d.id = ud.dashboard_id
-        WHERE d.id = $1 AND ud.user_id = $2
-      `;
-      accessParams = [id, userId];
+    const result = await pool.query('SELECT * FROM dashboards WHERE id = $1', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Dashboard not found' });
     }
-
-    const dashboardResult = await pool.query(accessQuery, accessParams);
-
-    if (dashboardResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Dashboard not found or access denied' });
-    }
-
-    const dashboard = dashboardResult.rows[0];
-
-    // Generate Tableau JWT
-    const tableauToken = generateTableauJWT();
-
-    res.json({
-      dashboard: {
-        ...dashboard,
-        tableau_token: tableauToken
-      }
-    });
+    
+    res.json({ dashboard: result.rows[0] });
   } catch (error) {
     console.error('Get dashboard error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+export const getAllDashboards = async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM dashboards ORDER BY nome');
+    res.json({ dashboards: result.rows });
+  } catch (error) {
+    console.error('Get all dashboards error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const createDashboard = async (req, res) => {
   try {
-    const { classe, nome, iframe, link, link_mobile } = req.body;
-
-    const insertQuery = `
-      INSERT INTO dashboards (classe, nome, iframe, link, link_mobile, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-      RETURNING *
-    `;
-
-    const result = await pool.query(insertQuery, [classe, nome, iframe, link, link_mobile]);
-    const newDashboard = result.rows[0];
-
-    res.status(201).json({
-      message: 'Dashboard created successfully',
-      dashboard: newDashboard
-    });
+    const { nome, descricao, url, classe } = req.body;
+    
+    const result = await pool.query(
+      'INSERT INTO dashboards (nome, descricao, url, classe) VALUES ($1, $2, $3, $4) RETURNING *',
+      [nome, descricao, url, classe]
+    );
+    
+    res.status(201).json({ message: 'Dashboard created successfully', dashboard: result.rows[0] });
   } catch (error) {
     console.error('Create dashboard error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -114,25 +63,18 @@ export const createDashboard = async (req, res) => {
 export const updateDashboard = async (req, res) => {
   try {
     const { id } = req.params;
-    const { classe, nome, iframe, link, link_mobile } = req.body;
-
-    const updateQuery = `
-      UPDATE dashboards 
-      SET classe = $1, nome = $2, iframe = $3, link = $4, link_mobile = $5, updated_at = NOW()
-      WHERE id = $6
-      RETURNING *
-    `;
-
-    const result = await pool.query(updateQuery, [classe, nome, iframe, link, link_mobile, id]);
-
+    const { nome, descricao, url, classe } = req.body;
+    
+    const result = await pool.query(
+      'UPDATE dashboards SET nome = $1, descricao = $2, url = $3, classe = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
+      [nome, descricao, url, classe, id]
+    );
+    
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Dashboard not found' });
     }
-
-    res.json({
-      message: 'Dashboard updated successfully',
-      dashboard: result.rows[0]
-    });
+    
+    res.json({ message: 'Dashboard updated successfully', dashboard: result.rows[0] });
   } catch (error) {
     console.error('Update dashboard error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -142,33 +84,14 @@ export const updateDashboard = async (req, res) => {
 export const deleteDashboard = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Start transaction
-    const client = await pool.connect();
     
-    try {
-      await client.query('BEGIN');
-      
-      // Delete user_dashboard relationships
-      await client.query('DELETE FROM user_dashboards WHERE dashboard_id = $1', [id]);
-      
-      // Delete dashboard
-      const deleteResult = await client.query('DELETE FROM dashboards WHERE id = $1 RETURNING *', [id]);
-      
-      if (deleteResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'Dashboard not found' });
-      }
-      
-      await client.query('COMMIT');
-      
-      res.json({ message: 'Dashboard deleted successfully' });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+    const result = await pool.query('DELETE FROM dashboards WHERE id = $1 RETURNING id', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Dashboard not found' });
     }
+    
+    res.json({ message: 'Dashboard deleted successfully' });
   } catch (error) {
     console.error('Delete dashboard error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -177,29 +100,14 @@ export const deleteDashboard = async (req, res) => {
 
 export const assignDashboard = async (req, res) => {
   try {
-    const { dashboardId, userId } = req.body;
-
-    // Check if assignment already exists
-    const existingQuery = 'SELECT id FROM user_dashboards WHERE user_id = $1 AND dashboard_id = $2';
-    const existingResult = await pool.query(existingQuery, [userId, dashboardId]);
-
-    if (existingResult.rows.length > 0) {
-      return res.status(409).json({ error: 'Dashboard already assigned to user' });
-    }
-
-    // Create assignment
-    const insertQuery = `
-      INSERT INTO user_dashboards (user_id, dashboard_id, created_at)
-      VALUES ($1, $2, NOW())
-      RETURNING *
-    `;
-
-    const result = await pool.query(insertQuery, [userId, dashboardId]);
-
-    res.status(201).json({
-      message: 'Dashboard assigned successfully',
-      assignment: result.rows[0]
-    });
+    const { userId, dashboardId } = req.body;
+    
+    await pool.query(
+      'INSERT INTO user_dashboards (user_id, dashboard_id) VALUES ($1, $2) ON CONFLICT (user_id, dashboard_id) DO NOTHING',
+      [userId, dashboardId]
+    );
+    
+    res.json({ message: 'Dashboard assigned successfully' });
   } catch (error) {
     console.error('Assign dashboard error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -208,15 +116,13 @@ export const assignDashboard = async (req, res) => {
 
 export const unassignDashboard = async (req, res) => {
   try {
-    const { dashboardId, userId } = req.body;
-
-    const deleteQuery = 'DELETE FROM user_dashboards WHERE user_id = $1 AND dashboard_id = $2 RETURNING *';
-    const result = await pool.query(deleteQuery, [userId, dashboardId]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Assignment not found' });
-    }
-
+    const { userId, dashboardId } = req.body;
+    
+    await pool.query(
+      'DELETE FROM user_dashboards WHERE user_id = $1 AND dashboard_id = $2',
+      [userId, dashboardId]
+    );
+    
     res.json({ message: 'Dashboard unassigned successfully' });
   } catch (error) {
     console.error('Unassign dashboard error:', error);
@@ -226,12 +132,20 @@ export const unassignDashboard = async (req, res) => {
 
 export const getTableauToken = async (req, res) => {
   try {
-    const token = generateTableauJWT();
+    const JWT_SECRET = process.env.TABLEAU_EMBEDDED_SECRET || '4mtYgy+k+qonbIHB1XnCTYrMqumoivCy95+ezVx2joo=';
+    const EMBEDDED_ID = process.env.TABLEAU_EMBEDDED_ID || '3a8d113d-e4dc-44eb-a3b9-e4d79ee60d8e';
+    const USER_EMAIL = process.env.TABLEAU_USER_EMAIL || 'futuroncontato@gmail.com';
     
-    res.json({
-      token,
-      expires_in: 600 // 10 minutes
-    });
+    const token = jwt.sign({
+      iss: EMBEDDED_ID,
+      exp: Math.floor(Date.now() / 1000) + (60 * 10),
+      jti: Math.random().toString(36).substring(2, 15),
+      aud: "tableau",
+      sub: USER_EMAIL,
+      scp: ["tableau:views:embed", "tableau:metrics:embed"]
+    }, JWT_SECRET, { algorithm: 'HS256' });
+    
+    res.json({ token });
   } catch (error) {
     console.error('Get Tableau token error:', error);
     res.status(500).json({ error: 'Internal server error' });
