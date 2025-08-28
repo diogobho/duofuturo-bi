@@ -65,3 +65,46 @@ router.get('/:id/dashboards', requireRole(['creator']), async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Get dashboards not assigned to user
+router.get('/:id/unassigned-dashboards', requireRole(['creator']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(`
+      SELECT d.id, d.nome, d.classe, d.descricao, d.url
+      FROM dashboards d
+      WHERE d.id NOT IN (
+        SELECT dashboard_id 
+        FROM user_dashboards 
+        WHERE user_id = $1
+      )
+      ORDER BY d.nome
+    `, [id]);
+    
+    res.json({ dashboards: result.rows });
+  } catch (error) {
+    console.error('Get unassigned dashboards error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get user's dashboards
+router.get('/:id/dashboards', requireRole(['creator']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(`
+      SELECT d.*, ud.created_at as assigned_at
+      FROM dashboards d
+      JOIN user_dashboards ud ON d.id = ud.dashboard_id
+      WHERE ud.user_id = $1
+      ORDER BY d.nome
+    `, [id]);
+    
+    res.json({ dashboards: result.rows });
+  } catch (error) {
+    console.error('Get user dashboards error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});

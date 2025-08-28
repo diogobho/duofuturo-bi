@@ -39,7 +39,6 @@ class ApiClient {
     return await response.json();
   }
 
-  // Auth endpoints
   async login(email: string, password: string) {
     const result = await this.request('/auth/login', {
       method: 'POST',
@@ -57,7 +56,6 @@ class ApiClient {
     return this.request('/users/profile');
   }
 
-  // User endpoints
   async getUsers() {
     return this.request('/users');
   }
@@ -94,7 +92,6 @@ class ApiClient {
     });
   }
 
-  // Dashboard endpoints
   async getDashboards() {
     return this.request('/dashboards');
   }
@@ -132,12 +129,27 @@ class ApiClient {
     return this.request('/dashboards/tableau/token');
   }
 
-  // Association endpoints
-  async assignDashboard(userId: number, dashboardId: number) {
-    return this.request('/dashboards/assign', {
+  // Associações inteligentes - múltiplas seleções
+  async assignMultipleDashboards(userId: number, dashboardIds: number[]) {
+    return this.request('/dashboards/assign-multiple', {
       method: 'POST',
-      body: JSON.stringify({ userId, dashboardId }),
+      body: JSON.stringify({ userId, dashboardIds }),
     });
+  }
+
+  async assignDashboardToMultipleUsers(dashboardId: number, userIds: number[]) {
+    return this.request('/dashboards/assign-to-multiple-users', {
+      method: 'POST',
+      body: JSON.stringify({ dashboardId, userIds }),
+    });
+  }
+
+  async getUserDashboards(userId: number) {
+    return this.request(`/users/${userId}/dashboards`);
+  }
+
+  async getAllAssignments() {
+    return this.request('/dashboards/assignments');
   }
 
   async unassignDashboard(userId: number, dashboardId: number) {
@@ -145,6 +157,14 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ userId, dashboardId }),
     });
+  }
+
+  async getUsersWithoutDashboard(dashboardId: number) {
+    return this.request(`/dashboards/${dashboardId}/unassigned-users`);
+  }
+
+  async getDashboardsNotAssignedToUser(userId: number) {
+    return this.request(`/users/${userId}/unassigned-dashboards`);
   }
 }
 
