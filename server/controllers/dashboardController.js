@@ -3,43 +3,25 @@ import jwt from 'jsonwebtoken';
 
 export const getUserDashboards = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT d.*, ud.created_at as assigned_at 
-      FROM dashboards d 
-      LEFT JOIN user_dashboards ud ON d.id = ud.dashboard_id 
-      WHERE ud.user_id = $1 OR $2 = 'creator'
-      ORDER BY d.nome
-    `, [req.user.id, req.user.role]);
+    let result;
+    
+    if (req.user.role === 'creator') {
+      // Creators see all dashboards
+      result = await pool.query('SELECT * FROM dashboards ORDER BY nome');
+    } else {
+      // Viewers only see assigned dashboards
+      result = await pool.query(`
+        SELECT d.*, ud.created_at as assigned_at 
+        FROM dashboards d 
+        JOIN user_dashboards ud ON d.id = ud.dashboard_id 
+        WHERE ud.user_id = $1
+        ORDER BY d.nome
+      `, [req.user.id]);
+    }
     
     res.json({ dashboards: result.rows });
   } catch (error) {
     console.error('Get user dashboards error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const getDashboard = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query('SELECT * FROM dashboards WHERE id = $1', [id]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Dashboard not found' });
-    }
-    
-    res.json({ dashboard: result.rows[0] });
-  } catch (error) {
-    console.error('Get dashboard error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const getAllDashboards = async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM dashboards ORDER BY nome');
-    res.json({ dashboards: result.rows });
-  } catch (error) {
-    console.error('Get all dashboards error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -56,44 +38,6 @@ export const createDashboard = async (req, res) => {
     res.status(201).json({ message: 'Dashboard created successfully', dashboard: result.rows[0] });
   } catch (error) {
     console.error('Create dashboard error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const updateDashboard = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { nome, descricao, url, classe } = req.body;
-    
-    const result = await pool.query(
-      'UPDATE dashboards SET nome = $1, descricao = $2, url = $3, classe = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
-      [nome, descricao, url, classe, id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Dashboard not found' });
-    }
-    
-    res.json({ message: 'Dashboard updated successfully', dashboard: result.rows[0] });
-  } catch (error) {
-    console.error('Update dashboard error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const deleteDashboard = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const result = await pool.query('DELETE FROM dashboards WHERE id = $1 RETURNING id', [id]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Dashboard not found' });
-    }
-    
-    res.json({ message: 'Dashboard deleted successfully' });
-  } catch (error) {
-    console.error('Delete dashboard error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -148,6 +92,60 @@ export const getTableauToken = async (req, res) => {
     res.json({ token });
   } catch (error) {
     console.error('Get Tableau token error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const updateDashboard = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, descricao, url, classe } = req.body;
+    
+    const result = await pool.query(
+      'UPDATE dashboards SET nome = $1, descricao = $2, url = $3, classe = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
+      [nome, descricao, url, classe, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Dashboard not found' });
+    }
+    
+    res.json({ message: 'Dashboard updated successfully', dashboard: result.rows[0] });
+  } catch (error) {
+    console.error('Update dashboard error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const deleteDashboard = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query('DELETE FROM dashboards WHERE id = $1 RETURNING id', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Dashboard not found' });
+    }
+    
+    res.json({ message: 'Dashboard deleted successfully' });
+  } catch (error) {
+    console.error('Delete dashboard error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getDashboard = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM dashboards WHERE id = $1', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Dashboard not found' });
+    }
+    
+    res.json({ dashboard: result.rows[0] });
+  } catch (error) {
+    console.error('Get dashboard error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

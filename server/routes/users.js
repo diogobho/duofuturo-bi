@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.use(verifyToken);
 
-router.get('/profile', getUserProfile);
+router.get("/profile", async (req, res) => { try { res.json({ user: req.user }); } catch (error) { console.error("Get profile error:", error); res.status(500).json({ error: "Internal server error" }); } });
 router.get('/', requireRole(['creator']), getUsers);
 router.get('/:id', requireRole(['creator']), getUser);
 
@@ -45,3 +45,23 @@ router.delete('/:id', requireRole(['creator']), deleteUser);
 router.post('/:id/change-password', requireRole(['creator']), changePassword);
 
 export default router;
+
+// Get user's dashboards
+router.get('/:id/dashboards', requireRole(['creator']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(`
+      SELECT d.*, ud.created_at as assigned_at
+      FROM dashboards d
+      JOIN user_dashboards ud ON d.id = ud.dashboard_id
+      WHERE ud.user_id = $1
+      ORDER BY d.nome
+    `, [id]);
+    
+    res.json({ dashboards: result.rows });
+  } catch (error) {
+    console.error('Get user dashboards error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});

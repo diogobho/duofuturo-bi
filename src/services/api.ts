@@ -38,15 +38,28 @@ class ApiClient {
     return await response.json();
   }
 
-  // Auth endpoints
   async login(email: string, password: string) {
-    return this.request('/auth/login', {
+    const result = await this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+    
+    if (result.token) {
+      this.setToken(result.token);
+    }
+    
+    return result;
   }
 
-  async register(userData: {
+  async getProfile() {
+    return this.request('/users/profile');
+  }
+
+  async getUsers() {
+    return this.request('/users');
+  }
+
+  async createUser(userData: {
     username: string;
     password: string;
     nome: string;
@@ -55,56 +68,44 @@ class ApiClient {
     endereco: string;
     role?: string;
   }) {
-    return this.request('/auth/register', {
+    return this.request('/users', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
   }
 
-  async refreshToken(refreshToken: string) {
-    return this.request('/auth/refresh', {
-      method: 'POST',
-      body: JSON.stringify({ refreshToken }),
-    });
-  }
-
-  async logout() {
-    return this.request('/auth/logout', {
-      method: 'POST',
-    });
-  }
-
-  async resetPassword(email: string, data_nascimento: string, new_password: string) {
-    return this.request('/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({ email, data_nascimento, new_password }),
-    });
-  }
-
-  async getProfile() {
-    return this.request('/users/profile');
-  }
-
-  // Dashboard endpoints
   async getDashboards() {
     return this.request('/dashboards');
   }
 
-  async getDashboard(id: number) {
-    return this.request(`/dashboards/${id}`);
+  async createDashboard(dashboardData: {
+    nome: string;
+    descricao: string;
+    url: string;
+    classe: string;
+  }) {
+    return this.request('/dashboards', {
+      method: 'POST',
+      body: JSON.stringify(dashboardData),
+    });
   }
 
-  async getTableauToken() {
-    return this.request('/dashboards/tableau/token');
+  async assignDashboard(userId: number, dashboardId: number) {
+    return this.request('/dashboards/assign', {
+      method: 'POST',
+      body: JSON.stringify({ userId, dashboardId }),
+    });
   }
 
-  // User endpoints
-  async getUsers() {
-    return this.request('/users');
+  async unassignDashboard(userId: number, dashboardId: number) {
+    return this.request('/dashboards/unassign', {
+      method: 'POST',
+      body: JSON.stringify({ userId, dashboardId }),
+    });
   }
 
-  async getUser(id: number) {
-    return this.request(`/users/${id}`);
+  async getUserAssignments(userId: number) {
+    return this.request(`/users/${userId}/dashboards`);
   }
 }
 
