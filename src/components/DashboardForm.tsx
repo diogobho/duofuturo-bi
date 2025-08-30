@@ -6,6 +6,7 @@ interface DashboardFormData {
   nome: string;
   descricao: string;
   url: string;
+  iframe?: string;
   classe: string;
 }
 

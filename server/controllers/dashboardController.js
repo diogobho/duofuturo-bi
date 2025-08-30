@@ -24,9 +24,9 @@ export const getUserDashboards = async (req, res) => {
 
 export const createDashboard = async (req, res) => {
   try {
-    const { nome, descricao, url, classe } = req.body;
+    const { nome, descricao, url, iframe, classe } = req.body;
     const result = await pool.query(
-      'INSERT INTO dashboards (nome, descricao, url, classe) VALUES ($1, $2, $3, $4) RETURNING *',
+      'INSERT INTO dashboards (nome, descricao, url, iframe, classe) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [nome, descricao || '', url, classe]
     );
     res.status(201).json({ message: 'Dashboard created successfully', dashboard: result.rows[0] });
@@ -39,7 +39,7 @@ export const createDashboard = async (req, res) => {
 export const updateDashboard = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, descricao, url, classe } = req.body;
+    const { nome, descricao, url, iframe, classe } = req.body;
     const result = await pool.query(
       'UPDATE dashboards SET nome = $1, descricao = $2, url = $3, classe = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
       [nome, descricao, url, classe, id]
