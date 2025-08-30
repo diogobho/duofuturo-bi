@@ -41,8 +41,8 @@ export const updateDashboard = async (req, res) => {
     const { id } = req.params;
     const { nome, descricao, url, iframe, classe } = req.body;
     const result = await pool.query(
-      'UPDATE dashboards SET nome = $1, descricao = $2, url = $3, iframe = $4, classe = $5, updated_at = NOW() WHERE id = $5 RETURNING *',
-      [nome, descricao, url, iframe, classe, id]
+      'UPDATE dashboards SET nome = $1, descricao = $2, url = $3, classe = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
+      [nome, descricao, url, classe, id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Dashboard not found' });

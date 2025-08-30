@@ -7,7 +7,6 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { 
   BarChart3, 
   RefreshCw, 
-  Maximize2, 
   Monitor, 
   Smartphone,
   Eye,
@@ -30,12 +29,31 @@ export const DashboardPage: React.FC = () => {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [selectedDashboard, setSelectedDashboard] = useState<Dashboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
 
   useEffect(() => {
     loadDashboards();
   }, []);
+
+  useEffect(() => {
+    if (selectedDashboard) {
+      loadTableauScript();
+    }
+  }, [selectedDashboard]);
+
+  const loadTableauScript = () => {
+    // Remove script existente
+    const existingScript = document.querySelector('script[src*="tableau.embedding"]');
+    if (existingScript) {
+      existingScript.remove();
+    }
+
+    // Adicionar script do Tableau
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = 'https://prod-useast-a.online.tableau.com/javascripts/api/tableau.embedding.3.latest.min.js';
+    document.head.appendChild(script);
+  };
 
   const loadDashboards = async () => {
     try {
@@ -63,27 +81,9 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  const getDashboardUrl = () => {
+  const getTableauUrl = () => {
     if (!selectedDashboard) return '';
-    
-    // Usar iframe URL se disponível, senão usar url padrão
-    let baseUrl = selectedDashboard.iframe || selectedDashboard.url || '';
-    
-    if (!baseUrl) return '';
-    
-    // Adicionar parâmetros para embedding se não estiverem presentes
-    if (!baseUrl.includes('?')) {
-      baseUrl += '?:embed=yes&:toolbar=bottom&:showVizHome=no&:device=desktop';
-    }
-    
-    return baseUrl;
-  };
-
-  const openFullscreen = () => {
-    if (selectedDashboard) {
-      const url = selectedDashboard.link || selectedDashboard.iframe || selectedDashboard.url;
-      window.open(url, '_blank');
-    }
+    return selectedDashboard.iframe || selectedDashboard.url || '';
   };
 
   if (isLoading) {
@@ -177,7 +177,7 @@ export const DashboardPage: React.FC = () => {
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        {/* View Toggle */}
+                        {/* View Toggle - SEM botão de tela cheia */}
                         <div className="flex bg-gray-100 rounded-lg p-1">
                           <button
                             onClick={() => setIsMobileView(false)}
@@ -202,40 +202,26 @@ export const DashboardPage: React.FC = () => {
                             Mobile
                           </button>
                         </div>
-
-                        <button
-                          onClick={openFullscreen}
-                          className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                          title="Abrir em Tela Cheia"
-                        >
-                          <Maximize2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Dashboard Content */}
+                  {/* Dashboard Content com Tableau-viz */}
                   <div className="p-6">
-                    <div className="relative bg-gray-50 rounded-lg overflow-hidden" 
-                         style={{ height: '1200px', minHeight: '800px' }}>
-                      {isDashboardLoading && (
-                        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-                          <LoadingSpinner size="large" />
-                        </div>
-                      )}
-                      
-                      <iframe
-                        src={getDashboardUrl()}
-                        className="w-full h-full border-0"
-                        allow="fullscreen"
-                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"
-                        onLoad={() => setIsDashboardLoading(false)}
-                        title={`Dashboard: ${selectedDashboard.nome}`}
-                        style={{ 
-                          width: '100%',
-                          height: '1200px',
-                          border: 'none',
-                          overflow: 'hidden'
+                    <div className="w-full bg-gray-50 rounded-lg overflow-hidden">
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: `
+                            <script type='module' src='https://prod-useast-a.online.tableau.com/javascripts/api/tableau.embedding.3.latest.min.js'></script>
+                            <tableau-viz 
+                              id='tableau-viz' 
+                              src='${getTableauUrl()}' 
+                              width='100%' 
+                              height='1163px' 
+                              toolbar='bottom'
+                              hide-tabs='true'
+                            ></tableau-viz>
+                          `
                         }}
                       />
                     </div>

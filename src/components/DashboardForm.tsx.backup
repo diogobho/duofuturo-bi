@@ -117,26 +117,6 @@ export const DashboardForm: React.FC<DashboardFormProps> = ({ dashboard, onClose
                 {dashboard ? 'Editar Dashboard' : 'Novo Dashboard'}
               </h3>
             </div>
-
-              {/* Campo URL do Iframe */}
-              <div>
-                <label htmlFor="iframe" className="block text-sm font-medium text-gray-700 mb-1">
-                  URL do Iframe (Embedding) *
-                </label>
-                <input
-                  type="url"
-                  id="iframe"
-                  name="iframe"
-                  value={formData.iframe || ""}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://prod-useast-a.online.tableau.com/t/futurondataview/views/..."
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Cole aqui a URL específica para embedding (iframe) do Tableau
-                </p>
-              </div>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600"
@@ -206,26 +186,6 @@ export const DashboardForm: React.FC<DashboardFormProps> = ({ dashboard, onClose
                 Cole aqui a URL completa do seu dashboard no Tableau Cloud
               </p>
             </div>
-
-              {/* Campo URL do Iframe */}
-              <div>
-                <label htmlFor="iframe" className="block text-sm font-medium text-gray-700 mb-1">
-                  URL do Iframe (Embedding) *
-                </label>
-                <input
-                  type="url"
-                  id="iframe"
-                  name="iframe"
-                  value={formData.iframe || ""}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://prod-useast-a.online.tableau.com/t/futurondataview/views/..."
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Cole aqui a URL específica para embedding (iframe) do Tableau
-                </p>
-              </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
